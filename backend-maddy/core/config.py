@@ -27,7 +27,17 @@ class Settings(BaseSettings):
     
     # File Upload Settings
     MAX_FILE_SIZE_MB: int = 10
-    ALLOWED_FILE_TYPES: list = ["application/pdf", "image/jpeg", "image/png", "image/jpg"]
+    ALLOWED_FILE_TYPES: list = [
+        "application/pdf", 
+        "image/jpeg", 
+        "image/png", 
+        "image/jpg",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ]
+    
+    # Admin
+    ADMIN_PASSWORD: str = "secret"
     
     class Config:
         env_file = ".env"

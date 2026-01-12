@@ -86,8 +86,8 @@ class IndividualCampaignCreate(BaseModel):
     
     # Sensitive fields (WILL BE encrypted)
     beneficiary_name: str = Field(..., min_length=2, max_length=100, description="Full name of beneficiary")
-    phone_number: str = Field(..., min_length=10, max_length=15, description="Contact phone number")
-    residential_address: str = Field(..., min_length=10, max_length=500, description="Residential address")
+    phone_number: str = Field(..., min_length=10, max_length=20, description="Contact phone number")
+    residential_address: str = Field(..., min_length=5, max_length=500, description="Residential address")
     verification_notes: Optional[str] = Field(None, max_length=2000, description="Internal notes for verification")
 
     model_config = ConfigDict(
@@ -124,8 +124,8 @@ class CharityCampaignCreate(BaseModel):
     
     # Sensitive fields (WILL BE encrypted)
     contact_person_name: str = Field(..., min_length=2, max_length=100, description="Contact person name")
-    contact_phone_number: str = Field(..., min_length=10, max_length=15, description="Contact phone number")
-    official_address: str = Field(..., min_length=10, max_length=500, description="Registered office address")
+    contact_phone_number: str = Field(..., min_length=10, max_length=20, description="Contact phone number")
+    official_address: str = Field(..., min_length=5, max_length=500, description="Registered office address")
     verification_notes: Optional[str] = Field(None, max_length=2000, description="Internal notes for verification")
 
     model_config = ConfigDict(
@@ -168,6 +168,7 @@ class CampaignPublicResponse(BaseModel):
     created_at: datetime
     end_date: datetime
     blockchain_tx_hash: Optional[str] = None
+    on_chain_id: Optional[str] = None  # Smart contract reference (null until blockchain integration)
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -274,6 +275,7 @@ class CampaignInDB(BaseModel):
     
     # Blockchain reference
     blockchain_tx_hash: Optional[str] = None
+    on_chain_id: Optional[str] = None  # Placeholder for smart contract ID (populated later)
     
     # Creator reference
     created_by: Optional[str] = None  # User ID

@@ -1,33 +1,166 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, useEffect, use } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import HeartProgressBar from '@/components/HeartProgressBar';
 import DonationModal from '@/components/DonationModal';
 import PriorityBanner from '@/components/PriorityBanner';
-import { getCampaignById, categoryLabels, categoryColors } from '@/data/mockData';
+import { api, CampaignPublicResponse } from '@/lib/api';
+import { getCampaignById, categoryLabels, categoryColors, Campaign } from '@/data/mockData';
 import { formatCurrency, calculatePercentage, formatDate, truncateHash, getDaysRemainingText } from '@/lib/utils';
 
 interface PageProps {
     params: Promise<{ id: string }>;
 }
 
+// Convert API response to frontend Campaign format
+function apiToFrontendCampaign(apiCampaign: CampaignPublicResponse): Campaign {
+    const daysLeft = Math.max(0, Math.ceil(
+        (new Date(apiCampaign.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    ));
+
+    // Map API category to frontend category
+    const categoryMap: Record<string, Campaign['category']> = {
+        'medical': 'medical',
+        'education': 'education',
+        'disaster relief': 'disaster',
+        'community': 'community',
+        'environment': 'environment',
+        'emergency': 'emergency',
+    };
+
+    const category = categoryMap[apiCampaign.category?.toLowerCase()] || 'community';
+
+    return {
+        id: apiCampaign.id,
+        title: apiCampaign.title,
+        description: apiCampaign.description.split('\n')[0], // First paragraph as short description
+        fullDescription: apiCampaign.description,
+        category,
+        image: apiCampaign.image_url || '/campaigns/default.jpg',
+        goal: apiCampaign.target_amount,
+        raised: apiCampaign.raised_amount,
+        daysLeft,
+        contributors: Math.floor(apiCampaign.raised_amount / 50), // Estimate
+        creatorName: apiCampaign.organization_name || 'Campaign Creator',
+        creatorAvatar: '/avatars/default.jpg',
+        isVerified: apiCampaign.status === 'approved' || apiCampaign.status === 'active',
+        isHighPriority: apiCampaign.priority === 'urgent',
+        createdAt: apiCampaign.created_at,
+        updates: [],
+        impactBreakdown: [
+            { label: 'Campaign Goal', percentage: 100, amount: apiCampaign.target_amount },
+        ],
+        recentDonors: [],
+    };
+}
+
 export default function CampaignDetailPage({ params }: PageProps) {
     const { id } = use(params);
-    const campaign = getCampaignById(id);
+    const searchParams = useSearchParams();
+    const justCreated = searchParams.get('created') === 'true';
+
+    const [campaign, setCampaign] = useState<Campaign | null>(null);
+    const [apiCampaign, setApiCampaign] = useState<CampaignPublicResponse | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'story' | 'updates' | 'donors'>('story');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    if (!campaign) {
-        notFound();
+    useEffect(() => {
+        async function fetchCampaign() {
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                // Try to fetch from backend first
+                const response = await api.getCampaign(id);
+                setApiCampaign(response);
+                setCampaign(apiToFrontendCampaign(response));
+            } catch (err) {
+                console.error('Failed to fetch from backend:', err);
+                // Fall back to mock data
+                const mockCampaign = getCampaignById(id);
+                if (mockCampaign) {
+                    setCampaign(mockCampaign);
+                } else {
+                    setError('Campaign not found');
+                }
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        fetchCampaign();
+    }, [id]);
+
+    const handleSubmitForVerification = async () => {
+        if (!apiCampaign) return;
+
+        setIsSubmitting(true);
+        try {
+            const updated = await api.submitForVerification(id);
+            setApiCampaign(updated);
+            setCampaign(apiToFrontendCampaign(updated));
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Failed to submit');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-[var(--beige-100)] flex items-center justify-center">
+                <motion.div
+                    className="text-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                >
+                    <div className="w-16 h-16 border-4 border-[var(--accent)] border-t-transparent rounded-full mx-auto mb-4 animate-spin" />
+                    <p className="text-[var(--text-secondary)]">Loading campaign...</p>
+                </motion.div>
+            </div>
+        );
+    }
+
+    if (error || !campaign) {
+        return (
+            <div className="min-h-screen bg-[var(--beige-100)] flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-6xl mb-4">😔</div>
+                    <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Campaign Not Found</h1>
+                    <p className="text-[var(--text-secondary)] mb-6">{error || 'This campaign does not exist.'}</p>
+                    <Link
+                        href="/campaigns"
+                        className="px-6 py-3 bg-[var(--accent)] text-white font-medium rounded-xl hover:opacity-90"
+                    >
+                        Browse Campaigns
+                    </Link>
+                </div>
+            </div>
+        );
     }
 
     const percentage = calculatePercentage(campaign.raised, campaign.goal);
+    const categoryColor = categoryColors[campaign.category] || '#8B4513';
 
     return (
         <div className="min-h-screen bg-[var(--beige-100)]">
+            {/* Success Banner for Just Created */}
+            {justCreated && (
+                <motion.div
+                    className="bg-[var(--success)] text-white py-3 px-4 text-center"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                >
+                    ✅ Campaign created successfully! It&apos;s saved as a draft. Submit it for verification when ready.
+                </motion.div>
+            )}
+
             {/* Priority Banner */}
             {campaign.isHighPriority && (
                 <PriorityBanner daysLeft={campaign.daysLeft} />
@@ -70,17 +203,19 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                 {/* Category Badge */}
                                 <div
                                     className="absolute top-4 left-4 px-4 py-1.5 rounded-full text-white text-sm font-medium"
-                                    style={{ backgroundColor: categoryColors[campaign.category] }}
+                                    style={{ backgroundColor: categoryColor }}
                                 >
                                     {categoryLabels[campaign.category]}
                                 </div>
-                                {/* Verified Badge */}
-                                {campaign.isVerified && (
-                                    <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 bg-[var(--success)] text-white rounded-full text-sm font-medium">
-                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                        Verified
+                                {/* Status Badge */}
+                                {apiCampaign && (
+                                    <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full text-sm font-medium ${apiCampaign.status === 'draft' ? 'bg-gray-500 text-white' :
+                                        apiCampaign.status === 'pending_verification' ? 'bg-amber-500 text-white' :
+                                            apiCampaign.status === 'approved' ? 'bg-blue-500 text-white' :
+                                                apiCampaign.status === 'active' ? 'bg-[var(--success)] text-white' :
+                                                    'bg-gray-500 text-white'
+                                        }`}>
+                                        {apiCampaign.status.replace('_', ' ').toUpperCase()}
                                     </div>
                                 )}
                             </div>
@@ -117,6 +252,17 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                     <p className="text-xs text-[var(--text-secondary)]">Funded</p>
                                 </div>
                             </div>
+
+                            {/* Submit for Verification Button (for draft campaigns) */}
+                            {apiCampaign?.status === 'draft' && (
+                                <button
+                                    onClick={handleSubmitForVerification}
+                                    disabled={isSubmitting}
+                                    className="w-full py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {isSubmitting ? 'Submitting...' : '📋 Submit for Verification'}
+                                </button>
+                            )}
                         </motion.div>
 
                         {/* Right Column - Heart & Donation */}
@@ -164,13 +310,21 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                     </span>
                                 </div>
 
-                                {/* Donate Button */}
-                                <button
-                                    onClick={() => setIsDonationModalOpen(true)}
-                                    className="w-full py-4 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] text-white text-lg font-bold rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-lg"
-                                >
-                                    💝 Donate Now
-                                </button>
+                                {/* Blockchain Info */}
+                                {apiCampaign?.on_chain_id === null && (
+                                    <div className="bg-[var(--beige-100)] rounded-xl p-3 mb-6 text-center">
+                                        <p className="text-xs text-[var(--text-secondary)]">
+                                            🔗 Blockchain integration coming soon
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Donate Button - Hidden for now as per requirements */}
+                                <div className="bg-[var(--beige-100)] rounded-xl p-4 text-center">
+                                    <p className="text-sm text-[var(--text-secondary)]">
+                                        💝 Donation feature will be enabled after blockchain integration
+                                    </p>
+                                </div>
 
                                 {/* Share Buttons */}
                                 <div className="mt-6 pt-6 border-t border-[var(--beige-200)]">
@@ -189,11 +343,6 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                         <button className="w-10 h-10 flex items-center justify-center bg-[var(--beige-100)] rounded-full hover:bg-[#0A66C2] hover:text-white transition-all">
                                             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                                                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                                            </svg>
-                                        </button>
-                                        <button className="w-10 h-10 flex items-center justify-center bg-[var(--beige-100)] rounded-full hover:bg-[#25D366] hover:text-white transition-all">
-                                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                                             </svg>
                                         </button>
                                     </div>
@@ -217,8 +366,8 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
                                         className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all capitalize ${activeTab === tab
-                                                ? 'bg-white text-[var(--accent)] shadow-soft'
-                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                            ? 'bg-white text-[var(--accent)] shadow-soft'
+                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                             }`}
                                     >
                                         {tab}
@@ -237,7 +386,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                     <div className="prose max-w-none">
                                         <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Campaign Story</h2>
                                         {campaign.fullDescription.split('\n\n').map((paragraph, index) => (
-                                            <p key={index} className="text-[var(--text-secondary)] mb-4 leading-relaxed">
+                                            <p key={index} className="text-[var(--text-secondary)] mb-4 leading-relaxed whitespace-pre-wrap">
                                                 {paragraph}
                                             </p>
                                         ))}
@@ -258,7 +407,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <p className="text-[var(--text-secondary)]">No updates yet.</p>
+                                            <p className="text-[var(--text-secondary)]">No updates yet. Check back soon!</p>
                                         )}
                                     </div>
                                 )}
@@ -266,27 +415,31 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                 {activeTab === 'donors' && (
                                     <div>
                                         <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Recent Donors</h2>
-                                        <div className="space-y-4">
-                                            {campaign.recentDonors.map((donor) => (
-                                                <div key={donor.id} className="flex items-center justify-between py-3 border-b border-[var(--beige-200)] last:border-0">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-full bg-[var(--beige-200)] flex items-center justify-center">
-                                                            💝
+                                        {campaign.recentDonors.length > 0 ? (
+                                            <div className="space-y-4">
+                                                {campaign.recentDonors.map((donor) => (
+                                                    <div key={donor.id} className="flex items-center justify-between py-3 border-b border-[var(--beige-200)] last:border-0">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-full bg-[var(--beige-200)] flex items-center justify-center">
+                                                                💝
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium text-[var(--text-primary)]">{donor.name}</p>
+                                                                <p className="text-xs text-[var(--text-secondary)]">{formatDate(donor.date)}</p>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <p className="font-medium text-[var(--text-primary)]">{donor.name}</p>
-                                                            <p className="text-xs text-[var(--text-secondary)]">{formatDate(donor.date)}</p>
+                                                        <div className="text-right">
+                                                            <p className="font-bold text-[var(--accent)]">{formatCurrency(donor.amount)}</p>
+                                                            <p className="text-xs text-[var(--text-secondary)] font-mono">
+                                                                {truncateHash(donor.transactionHash)}
+                                                            </p>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className="font-bold text-[var(--accent)]">{formatCurrency(donor.amount)}</p>
-                                                        <p className="text-xs text-[var(--text-secondary)] font-mono">
-                                                            {truncateHash(donor.transactionHash)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-[var(--text-secondary)]">No donations yet. Be the first to donate!</p>
+                                        )}
                                     </div>
                                 )}
                             </motion.div>
@@ -294,28 +447,28 @@ export default function CampaignDetailPage({ params }: PageProps) {
 
                         {/* Sidebar */}
                         <div className="space-y-6">
-                            {/* Impact Breakdown */}
+                            {/* Campaign Info */}
                             <div className="bg-white rounded-2xl p-6 shadow-soft border border-[var(--card-border)]">
-                                <h3 className="font-bold text-[var(--text-primary)] mb-4">How Funds Will Be Used</h3>
-                                <div className="space-y-4">
-                                    {campaign.impactBreakdown.map((item, index) => (
-                                        <div key={index}>
-                                            <div className="flex justify-between text-sm mb-1">
-                                                <span className="text-[var(--text-secondary)]">{item.label}</span>
-                                                <span className="font-medium text-[var(--text-primary)]">{item.percentage}%</span>
-                                            </div>
-                                            <div className="h-2 bg-[var(--beige-200)] rounded-full overflow-hidden">
-                                                <motion.div
-                                                    className="h-full bg-[var(--accent)] rounded-full"
-                                                    initial={{ width: 0 }}
-                                                    whileInView={{ width: `${item.percentage}%` }}
-                                                    viewport={{ once: true }}
-                                                    transition={{ duration: 1, delay: index * 0.1 }}
-                                                />
-                                            </div>
-                                            <p className="text-xs text-[var(--text-secondary)] mt-1">{formatCurrency(item.amount)}</p>
+                                <h3 className="font-bold text-[var(--text-primary)] mb-4">Campaign Details</h3>
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-[var(--text-secondary)]">Created</span>
+                                        <span className="font-medium text-[var(--text-primary)]">{formatDate(campaign.createdAt)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-[var(--text-secondary)]">Category</span>
+                                        <span className="font-medium text-[var(--text-primary)]">{categoryLabels[campaign.category]}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-[var(--text-secondary)]">Duration</span>
+                                        <span className="font-medium text-[var(--text-primary)]">{campaign.daysLeft + 30} days</span>
+                                    </div>
+                                    {apiCampaign && (
+                                        <div className="flex justify-between">
+                                            <span className="text-[var(--text-secondary)]">Documents</span>
+                                            <span className="font-medium text-[var(--text-primary)]">{apiCampaign.documents_count} file(s)</span>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
 
@@ -325,17 +478,17 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                     <svg className="w-5 h-5 text-[var(--success)]" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                     </svg>
-                                    Blockchain Verified
+                                    Blockchain Status
                                 </h3>
-                                <p className="text-sm text-[var(--text-secondary)] mb-4">
-                                    All donations are recorded on-chain for complete transparency.
-                                </p>
                                 <div className="bg-[var(--beige-100)] rounded-xl p-4">
-                                    <p className="text-xs text-[var(--text-secondary)] mb-1">Contract Address</p>
-                                    <p className="text-xs font-mono text-[var(--text-primary)] break-all">
-                                        0x1234...5678abcd
+                                    <p className="text-xs text-[var(--text-secondary)] mb-1">On-Chain ID</p>
+                                    <p className="text-sm font-mono text-[var(--text-primary)]">
+                                        {apiCampaign?.on_chain_id || 'Not yet on blockchain'}
                                     </p>
                                 </div>
+                                <p className="text-xs text-[var(--text-secondary)] mt-3">
+                                    Smart contract integration will be added in the next phase.
+                                </p>
                             </div>
                         </div>
                     </div>

@@ -40,8 +40,12 @@ def convert_db_to_public_response(campaign: dict) -> dict:
     Convert a database campaign document to public response format.
     Strips all encrypted fields and exposes only public data.
     """
+    # Convert ObjectId to string
+    campaign_id = str(campaign.get("_id")) if campaign.get("_id") else None
+    
     return {
-        "_id": campaign.get("_id"),
+        "_id": campaign_id,
+        "id": campaign_id,  # Also provide 'id' for frontend compatibility
         "campaign_type": campaign.get("campaign_type"),
         "title": campaign.get("title"),
         "description": campaign.get("description"),
@@ -57,6 +61,7 @@ def convert_db_to_public_response(campaign: dict) -> dict:
         "created_at": campaign.get("created_at"),
         "end_date": campaign.get("end_date"),
         "blockchain_tx_hash": campaign.get("blockchain_tx_hash"),
+        "on_chain_id": campaign.get("on_chain_id"),  # Placeholder for smart contract
     }
 
 
@@ -101,7 +106,7 @@ async def create_individual_campaign(campaign: IndividualCampaignCreate = Body(.
         "duration_days": campaign.duration_days,
         "category": campaign.category,
         "priority": campaign.priority.value,
-        "status": CampaignStatus.DRAFT.value,
+        "status": CampaignStatus.ACTIVE.value,  # Auto-approve for MVP
         "image_url": campaign.image_url,
         
         # Encrypted fields
@@ -166,7 +171,7 @@ async def create_charity_campaign(campaign: CharityCampaignCreate = Body(...)):
         "duration_days": campaign.duration_days,
         "category": campaign.category,
         "priority": campaign.priority.value,
-        "status": CampaignStatus.DRAFT.value,
+        "status": CampaignStatus.ACTIVE.value,  # Auto-approve for MVP
         "image_url": campaign.image_url,
         "organization_name": campaign.organization_name,  # Public!
         

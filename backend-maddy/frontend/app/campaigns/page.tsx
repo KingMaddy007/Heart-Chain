@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CampaignCard from '@/components/CampaignCard';
-import { mockCampaigns, categoryLabels, Campaign } from '@/data/mockData';
+import { api, CampaignPublicResponse, CampaignType as ApiCampaignType } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import { Campaign, categoryLabels } from '@/data/mockData';
 
 type SortOption = 'newest' | 'ending' | 'funded' | 'priority';
-type CategoryFilter = Campaign['category'] | 'all';
+type CategoryFilter = string | 'all';
 
 const sortOptions: { value: SortOption; label: string }[] = [
     { value: 'newest', label: 'Newest First' },
@@ -16,6 +17,34 @@ const sortOptions: { value: SortOption; label: string }[] = [
     { value: 'priority', label: 'High Priority' },
 ];
 
+// Convert API response to frontend Campaign format
+function apiToFrontendCampaign(apiCampaign: CampaignPublicResponse): Campaign {
+    const daysLeft = Math.max(0, Math.ceil(
+        (new Date(apiCampaign.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    ));
+
+    return {
+        id: apiCampaign.id,
+        title: apiCampaign.title,
+        description: apiCampaign.description,
+        fullDescription: apiCampaign.description,
+        category: (apiCampaign.category?.toLowerCase().replace(' ', '_') || 'community') as Campaign['category'],
+        image: apiCampaign.image_url || '/campaigns/default.jpg',
+        goal: apiCampaign.target_amount,
+        raised: apiCampaign.raised_amount,
+        daysLeft,
+        contributors: Math.floor(apiCampaign.raised_amount / 50), // Estimate
+        creatorName: apiCampaign.organization_name || 'Campaign Creator',
+        creatorAvatar: '/avatars/default.jpg',
+        isVerified: apiCampaign.status === 'approved' || apiCampaign.status === 'active',
+        isHighPriority: apiCampaign.priority === 'urgent',
+        createdAt: apiCampaign.created_at,
+        updates: [],
+        impactBreakdown: [],
+        recentDonors: [],
+    };
+}
+
 export default function CampaignsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
@@ -23,13 +52,45 @@ export default function CampaignsPage() {
     const [priorityOnly, setPriorityOnly] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
 
+    // API state
+    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [useBackend, setUseBackend] = useState(true);
+
+    // Fetch campaigns from backend
+    useEffect(() => {
+        async function fetchCampaigns() {
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const response = await api.getCampaigns({ limit: 100 });
+                const frontendCampaigns = response.map(apiToFrontendCampaign);
+                setCampaigns(frontendCampaigns);
+                setUseBackend(true);
+            } catch (err) {
+                console.error('Failed to fetch from backend:', err);
+                setError('Using demo data (backend not connected)');
+                // Fall back to mock data
+                const { mockCampaigns } = await import('@/data/mockData');
+                setCampaigns(mockCampaigns);
+                setUseBackend(false);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        fetchCampaigns();
+    }, []);
+
     const filteredCampaigns = useMemo(() => {
-        let campaigns = [...mockCampaigns];
+        let result = [...campaigns];
 
         // Search filter
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
-            campaigns = campaigns.filter(
+            result = result.filter(
                 (c) =>
                     c.title.toLowerCase().includes(query) ||
                     c.description.toLowerCase().includes(query)
@@ -38,41 +99,56 @@ export default function CampaignsPage() {
 
         // Category filter
         if (categoryFilter !== 'all') {
-            campaigns = campaigns.filter((c) => c.category === categoryFilter);
+            result = result.filter((c) => c.category === categoryFilter);
         }
 
         // Priority filter
         if (priorityOnly) {
-            campaigns = campaigns.filter((c) => c.isHighPriority);
+            result = result.filter((c) => c.isHighPriority);
         }
 
         // Sorting
         switch (sortBy) {
             case 'newest':
-                campaigns.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                 break;
             case 'ending':
-                campaigns.sort((a, b) => a.daysLeft - b.daysLeft);
+                result.sort((a, b) => a.daysLeft - b.daysLeft);
                 break;
             case 'funded':
-                campaigns.sort((a, b) => b.raised - a.raised);
+                result.sort((a, b) => b.raised - a.raised);
                 break;
             case 'priority':
-                campaigns.sort((a, b) => {
+                result.sort((a, b) => {
                     if (a.isHighPriority !== b.isHighPriority) return a.isHighPriority ? -1 : 1;
                     return a.daysLeft - b.daysLeft;
                 });
                 break;
         }
 
-        return campaigns;
-    }, [searchQuery, categoryFilter, sortBy, priorityOnly]);
+        return result;
+    }, [campaigns, searchQuery, categoryFilter, sortBy, priorityOnly]);
 
     const stats = useMemo(() => {
-        const total = mockCampaigns.reduce((sum, c) => sum + c.raised, 0);
-        const urgent = mockCampaigns.filter((c) => c.isHighPriority).length;
-        return { total, urgent, count: mockCampaigns.length };
-    }, []);
+        const total = campaigns.reduce((sum, c) => sum + c.raised, 0);
+        const urgent = campaigns.filter((c) => c.isHighPriority).length;
+        return { total, urgent, count: campaigns.length };
+    }, [campaigns]);
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-[var(--beige-100)] flex items-center justify-center">
+                <motion.div
+                    className="text-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                >
+                    <div className="w-16 h-16 border-4 border-[var(--accent)] border-t-transparent rounded-full mx-auto mb-4 animate-spin" />
+                    <p className="text-[var(--text-secondary)]">Loading campaigns...</p>
+                </motion.div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[var(--beige-100)]">
@@ -90,6 +166,16 @@ export default function CampaignsPage() {
                         <p className="text-[var(--text-secondary)] max-w-2xl mx-auto">
                             Discover causes that matter and make a real difference in people&apos;s lives.
                         </p>
+                        {error && (
+                            <p className="text-sm text-amber-600 mt-2 bg-amber-50 inline-block px-4 py-1 rounded-full">
+                                ⚠️ {error}
+                            </p>
+                        )}
+                        {useBackend && !error && (
+                            <p className="text-sm text-[var(--success)] mt-2">
+                                ✓ Connected to backend
+                            </p>
+                        )}
                     </motion.div>
 
                     {/* Stats Bar */}
@@ -160,8 +246,8 @@ export default function CampaignsPage() {
                                         <button
                                             onClick={() => setCategoryFilter('all')}
                                             className={`w-full text-left px-4 py-2 rounded-xl transition-colors ${categoryFilter === 'all'
-                                                    ? 'bg-[var(--accent)] text-white'
-                                                    : 'hover:bg-[var(--beige-200)] text-[var(--text-secondary)]'
+                                                ? 'bg-[var(--accent)] text-white'
+                                                : 'hover:bg-[var(--beige-200)] text-[var(--text-secondary)]'
                                                 }`}
                                         >
                                             All Categories
@@ -171,8 +257,8 @@ export default function CampaignsPage() {
                                                 key={cat}
                                                 onClick={() => setCategoryFilter(cat)}
                                                 className={`w-full text-left px-4 py-2 rounded-xl transition-colors ${categoryFilter === cat
-                                                        ? 'bg-[var(--accent)] text-white'
-                                                        : 'hover:bg-[var(--beige-200)] text-[var(--text-secondary)]'
+                                                    ? 'bg-[var(--accent)] text-white'
+                                                    : 'hover:bg-[var(--beige-200)] text-[var(--text-secondary)]'
                                                     }`}
                                             >
                                                 {categoryLabels[cat]}
@@ -204,8 +290,8 @@ export default function CampaignsPage() {
                                                 key={option.value}
                                                 onClick={() => setSortBy(option.value)}
                                                 className={`w-full text-left px-4 py-2 rounded-xl transition-colors ${sortBy === option.value
-                                                        ? 'bg-[var(--accent)] text-white'
-                                                        : 'hover:bg-[var(--beige-200)] text-[var(--text-secondary)]'
+                                                    ? 'bg-[var(--accent)] text-white'
+                                                    : 'hover:bg-[var(--beige-200)] text-[var(--text-secondary)]'
                                                     }`}
                                             >
                                                 {option.label}
@@ -258,7 +344,6 @@ export default function CampaignsPage() {
                                             </button>
                                         </div>
 
-                                        {/* Mobile filter options - same as desktop */}
                                         <div className="space-y-6">
                                             <div>
                                                 <h3 className="font-bold text-[var(--text-primary)] mb-3">Categories</h3>
