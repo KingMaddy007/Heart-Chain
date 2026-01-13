@@ -57,7 +57,13 @@ function apiToFrontendCampaign(apiCampaign: CampaignPublicResponse): Campaign {
         impactBreakdown: [
             { label: 'Campaign Goal', percentage: 100, amount: apiCampaign.target_amount },
         ],
-        recentDonors: [],
+        recentDonors: (apiCampaign.donations || []).map((d, i) => ({
+            id: i.toString(),
+            name: d.donor.length > 10 ? `${d.donor.substring(0, 6)}...${d.donor.substring(d.donor.length - 4)}` : d.donor,
+            amount: d.amount,
+            date: d.timestamp,
+            transactionHash: d.txHash
+        })),
     };
 }
 
@@ -200,8 +206,8 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                 {/* Status Badge */}
                                 {apiCampaign && (
                                     <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full text-sm font-medium ${apiCampaign.status === 'active' ? 'bg-[var(--success)] text-white' :
-                                            apiCampaign.status === 'completed' ? 'bg-blue-500 text-white' :
-                                                'bg-gray-500 text-white'
+                                        apiCampaign.status === 'completed' ? 'bg-blue-500 text-white' :
+                                            'bg-gray-500 text-white'
                                         }`}>
                                         {apiCampaign.status.toUpperCase()}
                                     </div>
@@ -296,10 +302,16 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                     </div>
                                 )}
 
-                                {/* Donate Button - Hidden for now as per requirements */}
-                                <div className="bg-[var(--beige-100)] rounded-xl p-4 text-center">
-                                    <p className="text-sm text-[var(--text-secondary)]">
-                                        💝 Donation feature will be enabled after blockchain integration
+                                {/* Donate Button */}
+                                <div className="bg-white rounded-xl p-1 mb-6">
+                                    <button
+                                        onClick={() => setIsDonationModalOpen(true)}
+                                        className="w-full py-4 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] text-white font-bold rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-[var(--accent)]/20 flex items-center justify-center gap-2"
+                                    >
+                                        <span>💝</span> Donate Now
+                                    </button>
+                                    <p className="text-xs text-center text-[var(--text-secondary)] mt-2">
+                                        Secure transaction powered by HeartChain
                                     </p>
                                 </div>
 
@@ -457,15 +469,36 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                     </svg>
                                     Blockchain Status
                                 </h3>
-                                <div className="bg-[var(--beige-100)] rounded-xl p-4">
-                                    <p className="text-xs text-[var(--text-secondary)] mb-1">On-Chain ID</p>
-                                    <p className="text-sm font-mono text-[var(--text-primary)]">
-                                        {apiCampaign?.on_chain_id || 'Not yet on blockchain'}
-                                    </p>
+
+                                <div className="space-y-4">
+                                    <div className="bg-[var(--beige-100)] rounded-xl p-4">
+                                        <p className="text-xs text-[var(--text-secondary)] mb-1">On-Chain ID</p>
+                                        <p className="text-sm font-mono text-[var(--text-primary)] break-all">
+                                            {apiCampaign?.on_chain_id || 'Waiting for block...'}
+                                        </p>
+                                    </div>
+
+                                    <div className="flex justify-between items-center text-sm border-t border-[var(--beige-200)] pt-3">
+                                        <span className="text-[var(--text-secondary)]">Contract State</span>
+                                        <span className={`font-medium px-2 py-0.5 rounded-full text-xs ${campaign.raised >= campaign.goal
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-[var(--success)] text-white'
+                                            }`}>
+                                            {campaign.raised >= campaign.goal ? 'Escrow Filled' : 'Active'}
+                                        </span>
+                                    </div>
+
+                                    {campaign.raised >= campaign.goal && (
+                                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                                            <p className="text-xs text-blue-800 font-medium mb-1">
+                                                🔒 Escrow Limit Reached
+                                            </p>
+                                            <p className="text-[10px] text-blue-600">
+                                                Target amount met. Smart contract has locked funds for release.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
-                                <p className="text-xs text-[var(--text-secondary)] mt-3">
-                                    Smart contract integration will be added in the next phase.
-                                </p>
                             </div>
                         </div>
                     </div>
@@ -479,6 +512,15 @@ export default function CampaignDetailPage({ params }: PageProps) {
                 campaignTitle={campaign.title}
                 currentAmount={campaign.raised}
                 goalAmount={campaign.goal}
+                onSuccess={async (amount, txHash) => {
+                    await api.donateToCampaign(campaign.id, amount, '0xUser...'); // In real app, use connected wallet
+                    // Refresh campaign data
+                    const updated = await api.getCampaign(campaign.id);
+                    if (updated) {
+                        setApiCampaign(updated);
+                        setCampaign(apiToFrontendCampaign(updated));
+                    }
+                }}
             />
         </div>
     );

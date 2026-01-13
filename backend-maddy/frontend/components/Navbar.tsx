@@ -15,6 +15,7 @@ const navLinks = [
 export default function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [walletAddress, setWalletAddress] = useState<string | null>(null);
     const pathname = usePathname();
 
     useEffect(() => {
@@ -22,8 +23,47 @@ export default function Navbar() {
             setIsScrolled(window.scrollY > 20);
         };
         window.addEventListener('scroll', handleScroll);
+
+        // Check if already connected
+        checkConnection();
+
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
+    const checkConnection = async () => {
+        if (typeof window !== 'undefined' && (window as any).ethereum) {
+            try {
+                const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    setWalletAddress(accounts[0]);
+                }
+            } catch (err) {
+                console.error("Failed to check wallet connection", err);
+            }
+        }
+    };
+
+    const connectWallet = async () => {
+        if (typeof window !== 'undefined' && (window as any).ethereum) {
+            try {
+                const accounts = await (window as any).ethereum.request({ method: 'eth_requestAccounts' });
+                setWalletAddress(accounts[0]);
+            } catch (error: any) {
+                if (error.code === 4001) {
+                    console.log("Connection request rejected by user.");
+                } else if (error.code === -32002) {
+                    // Request already pending
+                    console.log("Connection request already pending.");
+                    alert("A wallet request is already open. Please check your browser extension.");
+                } else {
+                    console.error("Failed to connect wallet:", error);
+                    alert("Failed to connect. See console for details.");
+                }
+            }
+        } else {
+            alert('Please install MetaMask to use this feature!');
+        }
+    };
 
     return (
         <>
@@ -62,8 +102,8 @@ export default function Navbar() {
                                     key={link.href}
                                     href={link.href}
                                     className={`relative font-medium transition-colors ${pathname === link.href
-                                            ? 'text-[var(--accent)]'
-                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                        ? 'text-[var(--accent)]'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                         }`}
                                 >
                                     {link.label}
@@ -85,11 +125,20 @@ export default function Navbar() {
                             >
                                 Start Campaign
                             </Link>
-                            <button className="px-5 py-2.5 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] text-white font-medium rounded-xl hover:opacity-90 transition-opacity flex items-center gap-2">
+                            <button
+                                onClick={connectWallet}
+                                className={`px-5 py-2.5 font-medium rounded-xl transition-all flex items-center gap-2 ${walletAddress
+                                    ? 'bg-[var(--success)] text-white hover:opacity-90'
+                                    : 'bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] text-white hover:opacity-90'
+                                    }`}
+                            >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                                 </svg>
-                                Connect Wallet
+                                {walletAddress
+                                    ? `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`
+                                    : 'Connect Wallet'
+                                }
                             </button>
                         </div>
 
@@ -135,8 +184,8 @@ export default function Navbar() {
                                         href={link.href}
                                         onClick={() => setIsMobileMenuOpen(false)}
                                         className={`block py-3 px-4 rounded-xl font-medium transition-colors ${pathname === link.href
-                                                ? 'bg-[var(--beige-200)] text-[var(--accent)]'
-                                                : 'text-[var(--text-secondary)] hover:bg-[var(--beige-100)]'
+                                            ? 'bg-[var(--beige-200)] text-[var(--accent)]'
+                                            : 'text-[var(--text-secondary)] hover:bg-[var(--beige-100)]'
                                             }`}
                                     >
                                         {link.label}
@@ -150,11 +199,20 @@ export default function Navbar() {
                                 >
                                     Start Campaign
                                 </Link>
-                                <button className="w-full py-3 px-4 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] text-white font-medium rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+                                <button
+                                    onClick={connectWallet}
+                                    className={`w-full py-3 px-4 font-medium rounded-xl transition-all flex items-center justify-center gap-2 ${walletAddress
+                                        ? 'bg-[var(--success)] text-white'
+                                        : 'bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] text-white'
+                                        }`}
+                                >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                                     </svg>
-                                    Connect Wallet
+                                    {walletAddress
+                                        ? `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`
+                                        : 'Connect Wallet'
+                                    }
                                 </button>
                             </div>
                         </motion.div>

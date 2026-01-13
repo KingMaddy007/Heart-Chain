@@ -11,6 +11,7 @@ interface DonationModalProps {
     campaignTitle: string;
     currentAmount: number;
     goalAmount: number;
+    onSuccess?: (amount: number, txHash: string) => void;
 }
 
 const presetAmounts = [5, 25, 50, 100];
@@ -21,6 +22,7 @@ export default function DonationModal({
     campaignTitle,
     currentAmount,
     goalAmount,
+    onSuccess,
 }: DonationModalProps) {
     const [amount, setAmount] = useState<number | string>(25);
     const [step, setStep] = useState<'select' | 'confirm' | 'success'>('select');
@@ -31,7 +33,14 @@ export default function DonationModal({
         setIsProcessing(true);
         // Simulate blockchain transaction
         await new Promise(resolve => setTimeout(resolve, 2000));
-        setTxHash(generateTxHash());
+        const newTxHash = generateTxHash();
+        setTxHash(newTxHash);
+
+        if (onSuccess) {
+            const numericAmount = typeof amount === 'string' ? parseFloat(amount) || 0 : amount;
+            onSuccess(numericAmount, newTxHash);
+        }
+
         setIsProcessing(false);
         setStep('success');
     };
@@ -94,8 +103,8 @@ export default function DonationModal({
                                             key={preset}
                                             onClick={() => setAmount(preset)}
                                             className={`py-3 rounded-xl font-medium transition-all ${amount === preset
-                                                    ? 'bg-[var(--accent)] text-white'
-                                                    : 'bg-[var(--beige-200)] text-[var(--text-primary)] hover:bg-[var(--beige-300)]'
+                                                ? 'bg-[var(--accent)] text-white'
+                                                : 'bg-[var(--beige-200)] text-[var(--text-primary)] hover:bg-[var(--beige-300)]'
                                                 }`}
                                         >
                                             ${preset}

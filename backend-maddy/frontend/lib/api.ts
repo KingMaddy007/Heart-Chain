@@ -65,6 +65,14 @@ export interface CreateResponse {
     status: string;
 }
 
+
+export interface Donation {
+    donor: string;
+    amount: number;
+    timestamp: string;
+    txHash: string;
+}
+
 // Frontend Representation of a Campaign (Stored in LocalStorage for MVP)
 export interface MockCampaign {
     id: string; // CID
@@ -86,6 +94,7 @@ export interface MockCampaign {
     blockchain_tx_hash: string | null;
     on_chain_id?: string | null;
     documents_count?: number;
+    donations?: Donation[];
 }
 
 export type CampaignPublicResponse = MockCampaign;
@@ -146,7 +155,8 @@ class ApiClient {
             status: 'active',
             image_url: data.image_url || null,
             created_at: new Date().toISOString(),
-            blockchain_tx_hash: res.tx_hash
+            blockchain_tx_hash: res.tx_hash,
+            donations: []
         });
 
         return res;
@@ -173,7 +183,8 @@ class ApiClient {
             image_url: data.image_url || null,
             organization_name: data.organization_name,
             created_at: new Date().toISOString(),
-            blockchain_tx_hash: res.tx_hash
+            blockchain_tx_hash: res.tx_hash,
+            donations: []
         });
 
         return res;
@@ -205,18 +216,43 @@ class ApiClient {
         return null;
     }
 
+    // ============== DONATIONS (MOCK) ==============
+
+    async donateToCampaign(id: string, amount: number, donorAddress: string): Promise<boolean> {
+        if (typeof window !== 'undefined') {
+            const campaigns: MockCampaign[] = JSON.parse(localStorage.getItem('heartchain_campaigns') || '[]');
+            const index = campaigns.findIndex(c => c.id === id);
+            if (index !== -1) {
+                const campaign = campaigns[index];
+                campaign.raised_amount += amount;
+
+                // Simulate Smart Contract: Check Escrow Limit
+                if (campaign.raised_amount >= campaign.target_amount && campaign.status === 'active') {
+                    campaign.status = 'completed'; // Auto-complete when target reached
+                    // In real contract, this might require a separate trigger or happen automatically
+                }
+
+                if (!campaign.donations) campaign.donations = [];
+                campaign.donations.unshift({
+                    donor: donorAddress,
+                    amount: amount,
+                    timestamp: new Date().toISOString(),
+                    txHash: "0xMOCK_TX_" + Math.random().toString(36).substr(2, 9)
+                });
+                localStorage.setItem('heartchain_campaigns', JSON.stringify(campaigns));
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ============== DOCUMENTS ==============
 
     async uploadDocument(file: File, documentType: DocumentType): Promise<CampaignDocument> {
         const formData = new FormData();
-        formData.append('document', file); // changed key from 'file' to 'document' if backend expects?
-        // Backend: document: UploadFile = File(...) -> field name 'document'
-        // Wait, backend `routes/documents.py`: `async def upload_document(document: UploadFile = File(...), ...)`
-        // Yes, field name is 'document'.
-
+        formData.append('document', file);
         formData.append('document_type', documentType);
 
-        // Stateless endpoint: /documents/upload
         const response = await fetch(`${this.baseUrl}/documents/upload`, {
             method: 'POST',
             body: formData,
