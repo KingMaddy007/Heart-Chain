@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body, HTTPException, status
-from typing import List, Dict
+from typing import List, Dict, Optional
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
 class CreateResponse(BaseModel):
     tx_hash: str
     cid: str
+    campaign_address: Optional[str] = None
     status: str = "submitted_to_chain"
 
 class IndividualCreateRequest(IndividualCampaignCreate):
@@ -41,13 +42,6 @@ async def create_individual_campaign(payload: IndividualCreateRequest):
         encryption = get_encryption()
         
         # Encrypt sensitive fields
-        # Note: encryption.encrypt returns Dict {nonce, ciphertext} ?? 
-        # Wait, core/encryption.py likely returns raw dict or object?
-        # Step 361 showed usage: `encryption.encrypt(str)` -> `{nonce:..., ciphertext:...}`?
-        # Let's verify encryption.encrypt return type. 
-        # Assuming it returns dict compatible with EncryptedField.
-        
-        # Build Metadata
         encrypted_info = {
             "beneficiary_name": encryption.encrypt(payload.beneficiary_name),
             "phone_number": encryption.encrypt(payload.phone_number),
@@ -74,9 +68,9 @@ async def create_individual_campaign(payload: IndividualCreateRequest):
         cid = await upload_json(metadata.model_dump(mode='json'))
         
         # Call Blockchain
-        tx_hash = await create_campaign_on_chain(payload.target_amount, cid)
+        tx_hash, campaign_address = await create_campaign_on_chain(payload.target_amount, cid)
         
-        return CreateResponse(tx_hash=tx_hash, cid=cid)
+        return CreateResponse(tx_hash=tx_hash, cid=cid, campaign_address=campaign_address)
 
     except Exception as e:
         import traceback
@@ -116,11 +110,9 @@ async def create_charity_campaign(payload: CharityCreateRequest):
         )
         
         cid = await upload_json(metadata.model_dump(mode='json'))
-        tx_hash = await create_campaign_on_chain(payload.target_amount, cid)
+        tx_hash, campaign_address = await create_campaign_on_chain(payload.target_amount, cid)
         
-        return CreateResponse(tx_hash=tx_hash, cid=cid)
+        return CreateResponse(tx_hash=tx_hash, cid=cid, campaign_address=campaign_address)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-

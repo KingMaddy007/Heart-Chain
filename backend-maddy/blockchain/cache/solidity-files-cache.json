@@ -1,13 +1,54 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "C:\\Users\\madha\\OneDrive\\Documents\\GitHub\\HeartChain\\backend-maddy\\blockchain\\contracts\\HeartChain.sol": {
-      "lastModificationDate": 1768252178374,
-      "contentHash": "03e4f2e3f45be1bfa742747d3628c8b5",
-      "sourceName": "contracts/HeartChain.sol",
+    "C:\\Users\\madha\\OneDrive\\Documents\\GitHub\\HeartChain\\backend-maddy\\blockchain\\contracts\\Campaign.sol": {
+      "lastModificationDate": 1768269156951,
+      "contentHash": "d8969797344a8c0034109028ee84f4b9",
+      "sourceName": "contracts/Campaign.sol",
       "solcConfig": {
-        "version": "0.8.19",
+        "version": "0.8.27",
         "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./DonationVault.sol",
+        "@openzeppelin/contracts/access/Ownable.sol",
+        "@openzeppelin/contracts/utils/ReentrancyGuard.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "Campaign"
+      ]
+    },
+    "C:\\Users\\madha\\OneDrive\\Documents\\GitHub\\HeartChain\\backend-maddy\\blockchain\\contracts\\DonationVault.sol": {
+      "lastModificationDate": 1768269139528,
+      "contentHash": "9b2632c2e2112500972d6ac6a0d701f4",
+      "sourceName": "contracts/DonationVault.sol",
+      "solcConfig": {
+        "version": "0.8.27",
+        "settings": {
+          "evmVersion": "paris",
           "optimizer": {
             "enabled": false,
             "runs": 200
@@ -33,7 +74,155 @@
         "^0.8.0"
       ],
       "artifacts": [
-        "HeartChain"
+        "DonationVault"
+      ]
+    },
+    "C:\\Users\\madha\\OneDrive\\Documents\\GitHub\\HeartChain\\backend-maddy\\blockchain\\node_modules\\@openzeppelin\\contracts\\access\\Ownable.sol": {
+      "lastModificationDate": 1768269138885,
+      "contentHash": "d3c790edc9ccf808a17c5a6cd13614fd",
+      "sourceName": "@openzeppelin/contracts/access/Ownable.sol",
+      "solcConfig": {
+        "version": "0.8.27",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../utils/Context.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "Ownable"
+      ]
+    },
+    "C:\\Users\\madha\\OneDrive\\Documents\\GitHub\\HeartChain\\backend-maddy\\blockchain\\node_modules\\@openzeppelin\\contracts\\utils\\ReentrancyGuard.sol": {
+      "lastModificationDate": 1768269138905,
+      "contentHash": "190613e556d509d9e9a0ea43dc5d891d",
+      "sourceName": "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
+      "solcConfig": {
+        "version": "0.8.27",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "ReentrancyGuard"
+      ]
+    },
+    "C:\\Users\\madha\\OneDrive\\Documents\\GitHub\\HeartChain\\backend-maddy\\blockchain\\node_modules\\@openzeppelin\\contracts\\utils\\Context.sol": {
+      "lastModificationDate": 1768269138677,
+      "contentHash": "67bfbc07588eb8683b3fd8f6f909563e",
+      "sourceName": "@openzeppelin/contracts/utils/Context.sol",
+      "solcConfig": {
+        "version": "0.8.27",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "Context"
+      ]
+    },
+    "C:\\Users\\madha\\OneDrive\\Documents\\GitHub\\HeartChain\\backend-maddy\\blockchain\\contracts\\CampaignFactory.sol": {
+      "lastModificationDate": 1768269168085,
+      "contentHash": "526dec0004f8b3d64ef290178d780064",
+      "sourceName": "contracts/CampaignFactory.sol",
+      "solcConfig": {
+        "version": "0.8.27",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./Campaign.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "CampaignFactory"
       ]
     }
   }

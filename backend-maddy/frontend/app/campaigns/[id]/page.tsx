@@ -81,27 +81,37 @@ export default function CampaignDetailPage({ params }: PageProps) {
 
     useEffect(() => {
         async function fetchCampaign() {
-            setIsLoading(true);
+            // Optimistic Loading: Check mock data instantly
+            const mockCampaign = getCampaignById(id);
+            if (mockCampaign) {
+                setCampaign(mockCampaign);
+                setIsLoading(false); // Show content immediately
+            } else {
+                setIsLoading(true);
+            }
+
             setError(null);
 
             try {
-                // Try to fetch from backend first
+                // Fetch fresh data from backend
                 const response = await api.getCampaign(id);
-                if (!response) throw new Error('Campaign not found');
-
-                setApiCampaign(response);
-                setCampaign(apiToFrontendCampaign(response));
-            } catch (err) {
-                console.error('Failed to fetch from backend:', err);
-                // Fall back to mock data
-                const mockCampaign = getCampaignById(id);
-                if (mockCampaign) {
-                    setCampaign(mockCampaign);
-                } else {
-                    setError('Campaign not found');
+                if (response) {
+                    setApiCampaign(response);
+                    setCampaign(apiToFrontendCampaign(response));
+                    setIsLoading(false);
+                } else if (!mockCampaign) {
+                    // Only error if we have neither mock nor real data
+                    throw new Error('Campaign not found');
                 }
-            } finally {
-                setIsLoading(false);
+            } catch (err) {
+                // If we have mock data, this failure is fine, just warn
+                if (mockCampaign) {
+                    console.warn('Backend fetch failed, using cached/mock data:', err);
+                } else {
+                    console.warn('Campaign fetch failed:', err);
+                    setError('Campaign not found');
+                    setIsLoading(false);
+                }
             }
         }
 
@@ -481,8 +491,8 @@ export default function CampaignDetailPage({ params }: PageProps) {
                                     <div className="flex justify-between items-center text-sm border-t border-[var(--beige-200)] pt-3">
                                         <span className="text-[var(--text-secondary)]">Contract State</span>
                                         <span className={`font-medium px-2 py-0.5 rounded-full text-xs ${campaign.raised >= campaign.goal
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-[var(--success)] text-white'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-[var(--success)] text-white'
                                             }`}>
                                             {campaign.raised >= campaign.goal ? 'Escrow Filled' : 'Active'}
                                         </span>
@@ -512,8 +522,8 @@ export default function CampaignDetailPage({ params }: PageProps) {
                 campaignTitle={campaign.title}
                 currentAmount={campaign.raised}
                 goalAmount={campaign.goal}
-                onSuccess={async (amount, txHash) => {
-                    await api.donateToCampaign(campaign.id, amount, '0xUser...'); // In real app, use connected wallet
+                onSuccess={async (amount, txHash, donorAddress) => {
+                    await api.donateToCampaign(campaign.id, amount, donorAddress); // Use real connected wallet
                     // Refresh campaign data
                     const updated = await api.getCampaign(campaign.id);
                     if (updated) {

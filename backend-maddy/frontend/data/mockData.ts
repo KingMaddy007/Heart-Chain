@@ -1,5 +1,19 @@
 // Mock Data for HeartChain Platform
 
+export interface Hospital {
+    id: string;
+    name: string;
+    adminId: string;
+    walletAddress: string;
+    location: string;
+}
+
+export const mockHospitals: Hospital[] = [
+    { id: 'HOSP_APOLLO_MUM', name: 'Apollo Hospital', adminId: 'ADMIN_RAJESH', walletAddress: '0xApolloWallet...', location: 'Mumbai' },
+    { id: 'HOSP_FORTIS_DEL', name: 'Fortis Escorts', adminId: 'ADMIN_PRIYA', walletAddress: '0xFortisWallet...', location: 'New Delhi' },
+    { id: 'HOSP_AIIMS_DEL', name: 'AIIMS Delhi', adminId: 'ADMIN_SURESH', walletAddress: '0xAiimsWallet...', location: 'New Delhi' }
+];
+
 export interface Campaign {
     id: string;
     title: string;
@@ -13,8 +27,12 @@ export interface Campaign {
     contributors: number;
     creatorName: string;
     creatorAvatar: string;
+    hospitalId?: string; // Link to a hospital
     isVerified: boolean;
     isHighPriority: boolean;
+    priority?: 'urgent' | 'critical' | 'normal';
+    status?: 'active' | 'completed' | 'funds_released';
+    fundsReleasedTxHash?: string;
     createdAt: string;
     updates: CampaignUpdate[];
     impactBreakdown: ImpactItem[];
@@ -75,15 +93,7 @@ export interface DonationHistoryItem {
     status: 'completed' | 'pending';
 }
 
-export interface LeaderboardEntry {
-    rank: number;
-    userId: string;
-    name: string;
-    avatar: string;
-    totalDonated: number;
-    campaignsSupported: number;
-    badges: string[];
-}
+
 
 // Category Labels
 export const categoryLabels: Record<Campaign['category'], string> = {
@@ -142,6 +152,7 @@ export const mockCampaigns: Campaign[] = [
             { id: '2', name: 'John D.', amount: 100, date: '2024-02-12', transactionHash: '0x2b3c4d5e6f7g...' },
             { id: '3', name: 'Maria S.', amount: 250, date: '2024-02-11', transactionHash: '0x3c4d5e6f7g8h...' },
         ],
+        hospitalId: 'HOSP_APOLLO_MUM',
     },
     {
         id: '2',
@@ -436,6 +447,7 @@ export const mockCampaigns: Campaign[] = [
         recentDonors: [
             { id: '1', name: 'Healthcare Heroes', amount: 5000, date: '2024-02-12', transactionHash: '0x3m4n5o6p7q8r...' },
         ],
+        hospitalId: 'HOSP_FORTIS_DEL',
     },
     {
         id: '10',
@@ -580,19 +592,7 @@ export const mockUser: User = {
     ],
 };
 
-// Mock Leaderboard
-export const mockLeaderboard: LeaderboardEntry[] = [
-    { rank: 1, userId: 'u1', name: 'Anonymous Whale', avatar: '/avatars/1.jpg', totalDonated: 125000, campaignsSupported: 45, badges: ['🦸', '⭐', '🎖️'] },
-    { rank: 2, userId: 'u2', name: 'Crypto Philanthropist', avatar: '/avatars/2.jpg', totalDonated: 98500, campaignsSupported: 38, badges: ['🦸', '⭐'] },
-    { rank: 3, userId: 'u3', name: 'Heart of Giving', avatar: '/avatars/3.jpg', totalDonated: 76200, campaignsSupported: 52, badges: ['🦸', '⭐', '🎖️'] },
-    { rank: 4, userId: 'u4', name: 'Blockchain Benefactor', avatar: '/avatars/4.jpg', totalDonated: 54300, campaignsSupported: 29, badges: ['🦸'] },
-    { rank: 5, userId: 'u5', name: 'DeFi Donor', avatar: '/avatars/5.jpg', totalDonated: 43100, campaignsSupported: 25, badges: ['🦸'] },
-    { rank: 6, userId: 'u6', name: 'Generous Guardian', avatar: '/avatars/6.jpg', totalDonated: 38700, campaignsSupported: 31, badges: ['🏆', '💛'] },
-    { rank: 7, userId: 'u7', name: 'Kindness Keeper', avatar: '/avatars/7.jpg', totalDonated: 31200, campaignsSupported: 18, badges: ['🏆', '💛'] },
-    { rank: 8, userId: 'u8', name: 'Hope Holder', avatar: '/avatars/8.jpg', totalDonated: 27800, campaignsSupported: 22, badges: ['🏆'] },
-    { rank: 9, userId: 'u9', name: 'Charity Champion', avatar: '/avatars/9.jpg', totalDonated: 21500, campaignsSupported: 15, badges: ['🏆'] },
-    { rank: 10, userId: 'u10', name: 'Love Giver', avatar: '/avatars/10.jpg', totalDonated: 18900, campaignsSupported: 20, badges: ['💛', '👼'] },
-];
+
 
 // Recent Donations for Ticker
 export const recentDonations = [

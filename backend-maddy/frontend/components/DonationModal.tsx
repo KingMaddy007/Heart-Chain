@@ -11,7 +11,7 @@ interface DonationModalProps {
     campaignTitle: string;
     currentAmount: number;
     goalAmount: number;
-    onSuccess?: (amount: number, txHash: string) => void;
+    onSuccess?: (amount: number, txHash: string, donorAddress: string) => void;
 }
 
 const presetAmounts = [5, 25, 50, 100];
@@ -25,24 +25,70 @@ export default function DonationModal({
     onSuccess,
 }: DonationModalProps) {
     const [amount, setAmount] = useState<number | string>(25);
-    const [step, setStep] = useState<'select' | 'confirm' | 'success'>('select');
+    const [step, setStep] = useState<'select' | 'confirm' | 'success' | 'error'>('select');
     const [isProcessing, setIsProcessing] = useState(false);
     const [txHash, setTxHash] = useState('');
+    const [currentAccount, setCurrentAccount] = useState<string>('0x1234...5678 (Demo)');
+
+    // Check for real wallet on mount/update
+    const updateWallet = async () => {
+        if (typeof window !== 'undefined' && (window as any).ethereum) {
+            try {
+                const { ethers } = await import('ethers');
+                const provider = new ethers.BrowserProvider((window as any).ethereum);
+                const accounts = await provider.listAccounts();
+                if (accounts.length > 0) {
+                    setCurrentAccount(accounts[0].address);
+                }
+            } catch (e) { console.warn(e); }
+        }
+    };
+
+    const handleSwitchWallet = async () => {
+        if (typeof window !== 'undefined' && (window as any).ethereum) {
+            try {
+                // Request permissions to prompt wallet selection
+                await (window as any).ethereum.request({
+                    method: 'wallet_requestPermissions',
+                    params: [{ eth_accounts: {} }]
+                });
+                await updateWallet();
+            } catch (e) {
+                console.error("Failed to switch wallet", e);
+            }
+        }
+    };
 
     const handleDonate = async () => {
         setIsProcessing(true);
-        // Simulate blockchain transaction
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        const newTxHash = generateTxHash();
-        setTxHash(newTxHash);
+        try {
+            // Simulate blockchain transaction or real logic could be here if moved from page.tsx
+            // currently page.tsx handles logic after onSuccess, so here we simulate UI delay
+            // If we want to support Real Failure for "Hybrid", we should probably pass a "donateFunction" prop instead of just onSuccess
+            // But for now, we assume success if simulate passes. 
+            // To demonstrate Failure UI, let's say if amount is 13 (unlucky layout?) no, 
+            // I'll just keep it simple basically always success unless logic fails.
 
-        if (onSuccess) {
-            const numericAmount = typeof amount === 'string' ? parseFloat(amount) || 0 : amount;
-            onSuccess(numericAmount, newTxHash);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Simulate random failure for demo purpose? No, users hate that.
+            // Only fail if actually error.
+
+            const newTxHash = generateTxHash();
+            setTxHash(newTxHash);
+
+            if (onSuccess) {
+                const numericAmount = typeof amount === 'string' ? parseFloat(amount) || 0 : amount;
+                // Wrapping in try catch if onSuccess is async
+                await onSuccess(numericAmount, newTxHash, currentAccount);
+            }
+
+            setIsProcessing(false);
+            setStep('success');
+        } catch (error) {
+            console.error(error);
+            setIsProcessing(false);
+            setStep('error');
         }
-
-        setIsProcessing(false);
-        setStep('success');
     };
 
     const handleClose = () => {
@@ -75,6 +121,7 @@ export default function DonationModal({
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: '100%', opacity: 0 }}
                         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                        onAnimationComplete={updateWallet}
                     >
                         {step === 'select' && (
                             <div className="p-6">
@@ -182,18 +229,26 @@ export default function DonationModal({
                                     </div>
                                 </div>
 
-                                {/* Wallet Connect Placeholder */}
+                                {/* Wallet Connect Placeholder with Option to Change */}
                                 <div className="border-2 border-dashed border-[var(--beige-300)] rounded-xl p-4 mb-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-[var(--beige-200)] rounded-full flex items-center justify-center">
-                                            <svg className="w-5 h-5 text-[var(--text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                            </svg>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="w-10 h-10 bg-[var(--beige-200)] rounded-full flex items-center justify-center flex-shrink-0">
+                                                <svg className="w-5 h-5 text-[var(--text-secondary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                                </svg>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="font-medium text-[var(--text-primary)]">Wallet Connected</p>
+                                                <p className="text-sm text-[var(--text-secondary)] truncate w-full">{currentAccount.slice(0, 10)}...{currentAccount.slice(-4)}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-medium text-[var(--text-primary)]">Wallet Connected</p>
-                                            <p className="text-sm text-[var(--text-secondary)]">0x1234...5678 (Demo)</p>
-                                        </div>
+                                        <button
+                                            onClick={handleSwitchWallet}
+                                            className="text-xs font-bold text-[var(--accent)] hover:underline whitespace-nowrap"
+                                        >
+                                            Change Wallet
+                                        </button>
                                     </div>
                                 </div>
 
@@ -290,6 +345,32 @@ export default function DonationModal({
                                 <button
                                     onClick={handleClose}
                                     className="w-full py-3 border-2 border-[var(--beige-300)] text-[var(--text-primary)] font-medium rounded-xl hover:bg-[var(--beige-100)] transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        )}
+
+                        {step === 'error' && (
+                            <div className="p-6 text-center">
+                                <div className="w-24 h-24 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-6">
+                                    <span className="text-4xl">😢</span>
+                                </div>
+
+                                <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Donation Failed</h2>
+                                <p className="text-[var(--text-secondary)] mb-6">
+                                    We really appreciate your intent to help! Unfortunately, something went wrong with the transaction.
+                                </p>
+
+                                <button
+                                    onClick={() => setStep('select')}
+                                    className="w-full py-3 bg-[var(--accent)] text-white font-medium rounded-xl hover:opacity-90 transition-opacity mb-3"
+                                >
+                                    Try Again
+                                </button>
+                                <button
+                                    onClick={handleClose}
+                                    className="w-full py-3 border-2 border-[var(--beige-300)] text-[var(--text-secondary)] font-medium rounded-xl hover:bg-[var(--beige-100)] transition-colors"
                                 >
                                     Close
                                 </button>

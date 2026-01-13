@@ -6,7 +6,7 @@ const PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY;
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-    solidity: "0.8.19",
+    solidity: "0.8.27",
     networks: {
         shardeum: {
             url: SHARDEUM_RPC,

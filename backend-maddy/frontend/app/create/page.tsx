@@ -43,6 +43,7 @@ interface FormData {
     category: string;
     targetAmount: string;
     durationDays: string;
+    hospitalId: string;
 
     // Step 2: Story
     description: string;
@@ -88,6 +89,7 @@ export default function CreateCampaignPage() {
         category: '',
         targetAmount: '',
         durationDays: '90',
+        hospitalId: '',
         description: '',
         imageUrl: '',
         impactPlan: '',
@@ -383,6 +385,25 @@ export default function CreateCampaignPage() {
                                             className="w-full px-4 py-3 border-2 border-[var(--beige-300)] rounded-xl focus:border-[var(--accent)] focus:outline-none"
                                         />
                                     </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                                        Select Hospital for Verification <span className="text-[var(--primary)] text-xs">(Required for Medical)</span>
+                                    </label>
+                                    <select
+                                        value={formData.hospitalId}
+                                        onChange={(e) => updateField('hospitalId', e.target.value)}
+                                        className="w-full px-4 py-3 border-2 border-[var(--beige-300)] rounded-xl focus:border-[var(--accent)] focus:outline-none bg-white"
+                                    >
+                                        <option value="">Select a partner hospital...</option>
+                                        <option value="HOSP_APOLLO_MUM">Apollo Hospital, Mumbai</option>
+                                        <option value="HOSP_FORTIS_DEL">Fortis Escorts, Delhi</option>
+                                        <option value="HOSP_AIIMS_DEL">AIIMS Delhi</option>
+                                    </select>
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1">
+                                        Partner hospitals verify patient details and receive funds directly.
+                                    </p>
                                 </div>
 
                                 {/* Individual-specific fields */}
